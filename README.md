@@ -15,10 +15,12 @@ You should boot QEMU with the bzImage kernel provided in the repository.  This k
 
 o sh runqemu.sh ./bzImage
 
-Files in the floppy directory will appear on the floppy disk within the virtual machine. To mount the floppy disk, use the command:
+Files in the floppy directory will appear as a hard disk within the virtual machine. To mount the hard disk, use the command:
 
-o mount -t msdos /dev/fd0 /mnt
+o mount -t msdos /dev/sdb1 /mnt
 
-The contents of floppy should appear in /mnt.
+The contents of hard disk should appear in /mnt.
 
-Please note that the size of the files in floppy must remain less than the size of an actual floppy disk.  If memory serves correctly, that is 1.44 MB.
+Be sure to use the following command to unmount the hard disk device before shutting down the virtual machine:
+
+o unmount /mnt
