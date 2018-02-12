@@ -18,7 +18,7 @@
 #ifndef _PWD_H
 
 struct passwd {
-	char pw_name[33];
+	char  pw_name[33];
 	uid_t pw_uid;
 	gid_t pw_gid;
 };
@@ -45,43 +45,54 @@ getpw(const char *username, const uid_t uid)
 
 	char buf[1024];
 	// Read /etc/passwd line-by-line
-	for (int linenum = 1; fgets(buf, 1024, fp) != NULL; linenum++) {
+	for (int line = 1; fgets(buf, 1024, fp) != NULL; line++) {
+		char *start, *end;
+		start = buf;
+		end = strchr(buf, ':');
+		if (end == NULL) {
+			fprintf(stderr, "/etc/passwd parse error at line %d\n", line);
+			exit(1);
+		}
+		*end = '\0';
+
 		// First part of entry is username, which we store for now
-		char *entry_uname = strtok(buf, ":");
+		char *entry_uname = start;
 
 		// If we're retrieving by username (uid == -1)
 		// we should continue the loop if the username doesn't match
 		// otherwise we'll keep going until we can check uid
 		if (uid != -1 || !strcmp(username, entry_uname)){
-			if (entry_uname == NULL) {
-				fprintf(stderr, "/etc/passwd parse error\n");
+			// Next is uid
+			// We ignore the password part of the entry
+			// which should always be just "x"
+			start = end + 3;
+			end = strchr(start, ':');
+
+			if (end == NULL) {
+				fprintf(stderr, "/etc/passwd parse error at line %d\n", line);
 				exit(1);
 			}
 
-			// We ignore the password part of the entry
-			// which should always be just "x"
-			strtok(NULL, ":");
-			// Next is uid
-			char *uid_str = strtok(NULL, ":");
-			if (uid_str == NULL) {
-				fprintf(stderr, "/etc/passwd parse error\n");
-				exit(1);
-			}
-			char *end = uid_str;
+			*end = '\0';
+			char *uid_str = start;
+			char *tol_end = uid_str;
 			// We convert the string to a uid_t
-			uid_t entry_uid = strtol(uid_str, &end, 10);
+			uid_t entry_uid = strtol(uid_str, &tol_end, 10);
 
 			// If it's the uid we want, or we already have the username we want
 			// we get the gid and return a struct
 			// otherwise, we keep searching
 			if (uid == entry_uid || uid == -1) {
 				// get the gid
-				char *gid_str = strtok(NULL, ":");
-				if (gid_str == NULL) {
-					fprintf(stderr, "/etc/passwd parse error\n");
+				start = end + 1;
+				if (start == NULL) {
+					fprintf(stderr, "/etc/passwd parse error at line %d\n", line);
 					exit(1);
 				}
-				end = gid_str;
+
+				char *gid_str = start;
+
+				tol_end = gid_str;
 				// convert to a gid_t
 				gid_t entry_gid = strtol(gid_str, &end, 10);
 	
@@ -110,7 +121,7 @@ getpwuid(const uid_t uid)
 }
 
 struct passwd *
-getpwnam(const char* username)
+getpwnam(const char *username)
 {
 	return getpw(username, -1);
 }
@@ -132,40 +143,49 @@ check_user_authorization(const char *current_uname,
 	// buffer should be more than enough
 	// for two 32-byte usernames (the maximum)
 	// plus a 255-byte password
-	char line[384];
+	char buf[384];
 	// Read in lines one at a time
-	for (int linenum = 1; fgets(line, 384, runas) != NULL; linenum++) {
+	for (int line = 1; fgets(buf, 384, runas) != NULL; line++) {
 		// replace newline with null-terminator
-		int length = strlen(line);
+		int length = strlen(buf);
 		if (length > 0) {
-			line[length-1] = '\0';
+			buf[length-1] = '\0';
 		} else {
-			fprintf(stderr, "/etc/runas parse error at line %d\n", linenum);
+			fprintf(stderr, "/etc/runas parse error at line %d\n", line);
+			exit(1);
+		}
+
+		char *start, *end;
+		start = buf;
+		end = strchr(start, ':');
+		if (end == NULL) {
+			fprintf(stderr, "/etc/runas parse error at line %d\n", line);
 			exit(1);
 		}
 
 		// compare username to one in current entry
-		char *entry_uname = strtok(line, ":");
-		if (entry_uname == NULL) {
-			fprintf(stderr, "/etc/runas parse error at line %d\n", linenum);
-			exit(1);
-		}
+		*end = '\0';
+		char *entry_uname = start;
 		if (strcmp(entry_uname, current_uname) == 0) {
 			// username matches
 			// compare target username to one in current entry
-			char *entry_target = strtok(NULL, ":");
-			if(entry_target == NULL) {
-				fprintf(stderr, "/etc/runas parse error at line %d\n", linenum);
+			start = end + 1;
+			end = strchr(start, ':');
+			if (end == NULL) {
+				fprintf(stderr, "/etc/runas parse error at line %d\n", line);
 				exit(1);
 			}
+			*end = '\0';
+			char *entry_target = start;
 			if (strcmp(entry_target, target_uname) == 0) {
 				// target username matches
 				// compare password to one in current entry
-				char *entry_pw = strtok(NULL, ":");
-				if (entry_pw == NULL) {
-					fprintf(stderr, "/etc/runas parse error at line %d\n", linenum);
+				start = end + 1;
+				if (start == NULL) {
+					fprintf(stderr, "/etc/runas parse error at line %d\n", line);
 					exit(1);
 				}
+				char *entry_pw = start;
 				// return 0 if the password matches, otherwise return 2
 				if (strcmp(entry_pw, password) == 0)
 					return 0;

@@ -1,7 +1,8 @@
 CC=gcc
 CFLAGS=-static -Wall
 
-runas: runas.o
+runas: runas.c
+	$(CC) $(CFLAGS) runas.c -o runas
 
 clean: 
-	rm *.o
+	rm runas
